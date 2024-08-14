@@ -1,43 +1,55 @@
-version: '3.8'
+version: '3'
 
 services:
-  db:
-    image: postgres:13
-    environment:
-      POSTGRES_DB: quickapp
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - ./backend:/app
+    build: ./backend
     ports:
       - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=QuickApp.settings
+      - DATABASE_URL=postgres://user:password@db:5432/quickapp
+      - DJANGO_SECRET_KEY=Ndsme-Lx-90MKvTLFVITqtQBvXPKiMFKU3nKveSVpixTLH_B777yYq_b98mQrrqoqqw
+      - DEBUG=True
+      - DOCKER_ENVIRONMENT=True
     depends_on:
       - db
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/quickapp
+    networks:
+      - app-network
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
 
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    build: ./frontend
     ports:
       - "5173:5173"
     environment:
-      - NODE_ENV=development
-    command: npm run dev -- --host
+      - VITE_API_URL=http://localhost:8000/api
     depends_on:
       - backend
+    networks:
+      - app-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=quickapp
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:
